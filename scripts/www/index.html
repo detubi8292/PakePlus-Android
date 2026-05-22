@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>月经周期记录与安全期预测</title>
+    <style>
+        :root {
+            --primary-color: #ff4d7d;
+            --light-pink: #ffe6ed;
+            --safe-green: #e6f9ed; 
+            --safe-green-text: #27ae60; 
+            --purple-text: #b259ff;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f7f7f7;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .phone-container {
+            width: 375px;
+            background: #fff;
+            border-radius: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* 登录遮罩层 */
+        .login-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: #fff;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 30px;
+            box-sizing: border-box;
+        }
+
+        .login-box {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .login-title {
+            font-size: 22px;
+            color: var(--primary-color);
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .login-box input {
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+
+        /* 顶部状态栏 */
+        .header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 20px;
+            position: relative;
+        }
+
+        .user-info-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
+            margin-bottom: 10px;
+            opacity: 0.9;
+        }
+
+        .logout-btn {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            padding: 3px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .month-selector {
+            font-size: 20px;
+            font-weight: bold;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .nav-btn {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+        }
+
+        /* 星期表头 */
+        .weekdays {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            text-align: center;
+            padding: 10px 5px;
+            background: #fff;
+            font-size: 14px;
+            color: #999;
+            border-bottom: 1px solid #eee;
+        }
+        .weekdays div:nth-child(1), .weekdays div:nth-child(7) {
+            color: var(--primary-color);
+        }
+
+        /* 日历网格 */
+        .days-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            padding: 5px;
+            background: #fff;
+        }
+
+        .day-cell {
+            height: 50px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-size: 16px;
+            color: #333;
+            position: relative;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .day-cell.empty { cursor: default; }
+
+        /* 经期样式 */
+        .day-cell.period-active {
+            background-color: var(--primary-color) !important;
+            color: white !important;
+            border-radius: 8px;
+        }
+        
+        .day-cell.period-start-icon::after {
+            content: '🩸';
+            font-size: 9px;
+            position: absolute;
+            top: 2px;
+            right: 2px;
+        }
+
+        /* 安全期样式 */
+        .day-cell.safe-zone {
+            background-color: var(--safe-green);
+            color: var(--safe-green-text);
+            font-weight: bold;
+        }
+
+        .day-cell.fertile-window { color: var(--purple-text); }
+        .day-cell.ovulation-day::before {
+            content: '🌼';
+            font-size: 10px;
+            position: absolute;
+            top: 2px;
+            right: 2px;
+        }
+
+        /* 底部配置面板 */
+        .control-panel {
+            padding: 20px;
+            background: #fff;
+            border-top: 1px solid #eee;
+        }
+
+        .legend {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 20px;
+            padding: 0 10px;
+        }
+
+        .legend-item { display: flex; align-items: center; gap: 4px; }
+        .dot { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+        .dot.m { background: var(--primary-color); }
+        .dot.p { background: var(--safe-green); border: 1px solid var(--safe-green-text); }
+        .dot.f { color: var(--purple-text); font-size: 12px; }
+
+        .settings-group {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            font-size: 14px;
+            color: #444;
+        }
+
+        .setting-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .setting-row input {
+            width: 60px;
+            padding: 4px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            text-align: center;
+        }
+
+        .btn-action {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 8px;
+            width: 100%;
+            font-size: 15px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="phone-container">
+    <div class="login-overlay" id="loginOverlay">
+        <div class="login-box">
+            <div class="login-title">女子月经周期管理系统</div>
+            <input type="text" id="username" placeholder="请输入用户名 (任意填写)">
+            <input type="password" id="password" placeholder="请输入密码 (任意填写)">
+            <button class="btn-action" onclick="handleLogin()">登录 / 切换账户</button>
+            <p style="font-size: 11px; color:#999; text-align:center; margin-top:10px;">
+                提示：您的账号密码和日历数据均保存在本地电脑，直接发送文件不会泄露隐私。
+            </p>
+        </div>
+    </div>
+
+    <div class="header">
+        <div class="user-info-bar">
+            <span>当前账户: <b id="displayUser">未登录</b></span>
+            <button class="logout-btn" onclick="handleLogout()">退出登录</button>
+        </div>
+        <div class="month-selector">
+            <button class="nav-btn" onclick="changeMonth(-1)">&lt;</button>
+            <span id="currentMonthStr">2026年5月</span>
+            <button class="nav-btn" onclick="changeMonth(1)">&gt;</button>
+        </div>
+    </div>
+
+    <div class="weekdays">
+        <div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div>
+    </div>
+
+    <div class="days-grid" id="daysGrid"></div>
+
+    <div class="control-panel">
+        <div class="legend">
+            <div class="legend-item"><span class="dot m"></span>月经期</div>
+            <div class="legend-item"><span class="dot p"></span>安全期</div>
+            <div class="legend-item"><span class="dot f">💜</span>易孕期</div>
+            <div class="legend-item"><span>🌼</span>排卵日</div>
+        </div>
+
+        <div class="settings-group">
+            <div class="setting-row">
+                <label>平均行经天数 (天):</label>
+                <input type="number" id="periodLength" value="6" min="1" max="15" onchange="saveAndCalculate()">
+            </div>
+            <div class="setting-row">
+                <label>平均周期长度 (天):</label>
+                <input type="number" id="cycleLength" value="28" min="20" max="45" onchange="saveAndCalculate()">
+            </div>
+            <div class="setting-row" style="border-top: 1px dashed #eee; padding-top: 10px;">
+                <span id="selectedDateText">点击日历选择一天进行记录</span>
+            </div>
+            <button class="btn-action" id="actionBtn" onclick="togglePeriodStart()">设为月经第一天</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentUser = null;
+    let currentDate = new Date(2026, 4, 1); 
+    let selectedDateStr = null; 
+    let periodStarts = []; 
+
+    let allPeriodDays = new Set(); 
+    let fertileWindows = new Set();
+    let ovulationDays = new Set();
+    let earliestStartDate = null; 
+
+    // 页面加载完毕后，尝试自动登录
+    window.onload = function() {
+        autoLoginCheck();
+    }
+
+    // 自动登录检测
+    function autoLoginCheck() {
+        const lastUser = localStorage.getItem('last_logged_in_user');
+        const lastPass = localStorage.getItem('last_logged_in_pass');
+
+        // 如果本地存有上一次登录的账号密码，直接自动填入并登录
+        if (lastUser && lastPass) {
+            document.getElementById('username').value = lastUser;
+            document.getElementById('password').value = lastPass;
+            handleLogin(true); // 传入 true 代表是自动登录，不弹窗提示
+        }
+    }
+
+    function handleLogin(isAuto = false) {
+        const user = document.getElementById('username').value.trim();
+        const pass = document.getElementById('password').value.trim();
+
+        if (!user || !pass) {
+            alert('用户名和密码不能为空！');
+            return;
+        }
+
+        currentUser = user;
+        document.getElementById('displayUser').innerText = user;
+        document.getElementById('loginOverlay').style.display = 'none';
+
+        // 登录成功，把当前账户密码记住（仅保存在这台电脑的本地浏览器中）
+        localStorage.setItem('last_logged_in_user', user);
+        localStorage.setItem('last_logged_in_pass', pass);
+
+        loadUserData();
+    }
+
+    function handleLogout() {
+        // 退出登录时，除了清空当前状态，也要把自动登录的记忆清空
+        localStorage.removeItem('last_logged_in_user');
+        localStorage.removeItem('last_logged_in_pass');
+
+        currentUser = null;
+        periodStarts = [];
+        selectedDateStr = null;
+        earliestStartDate = null;
+        document.getElementById('username').value = '';
+        document.getElementById('password').value = '';
+        document.getElementById('loginOverlay').style.display = 'flex';
+        document.getElementById('selectedDateText').innerText = '点击日历选择一天进行记录';
+    }
+
+    function saveUserData() {
+        if (!currentUser) return;
+
+        const dataToSave = {
+            periodStarts: periodStarts,
+            periodLength: document.getElementById('periodLength').value,
+            cycleLength: document.getElementById('cycleLength').value
+        };
+
+        localStorage.setItem(`period_data_${currentUser}`, JSON.stringify(dataToSave));
+    }
+
+    function loadUserData() {
+        const savedData = localStorage.getItem(`period_data_${currentUser}`);
+        
+        if (savedData) {
+            const parsed = JSON.parse(savedData);
+            periodStarts = parsed.periodStarts || [];
+            document.getElementById('periodLength').value = parsed.periodLength || 6;
+            document.getElementById('cycleLength').value = parsed.cycleLength || 28;
+        } else {
+            periodStarts = [];
+            document.getElementById('periodLength').value = 6;
+            document.getElementById('cycleLength').value = 28;
+        }
+
+        calculateCycles();
+    }
+
+    function saveAndCalculate() {
+        saveUserData();
+        calculateCycles();
+    }
+
+    function calculateCycles() {
+        allPeriodDays.clear();
+        fertileWindows.clear();
+        ovulationDays.clear();
+        earliestStartDate = null;
+
+        const pLength = parseInt(document.getElementById('periodLength').value) || 6;
+        const cLength = parseInt(document.getElementById('cycleLength').value) || 28;
+
+        if (periodStarts.length === 0) {
+            renderCalendar();
+            return;
+        }
+
+        let sortedStarts = [...periodStarts].map(d => new Date(d)).sort((a,b) => a - b);
+        earliestStartDate = sortedStarts[0];
+        
+        sortedStarts.forEach(start => {
+            for(let i=0; i<pLength; i++) {
+                let d = new Date(start);
+                d.setDate(start.getDate() + i);
+                allPeriodDays.add(formatDate(d));
+            }
+        });
+
+        let baseDate = new Date(sortedStarts[sortedStarts.length - 1]);
+        for(let cycle = 1; cycle <= 3; cycle++) {
+            let nextStart = new Date(baseDate);
+            nextStart.setDate(baseDate.getDate() + (cLength * cycle));
+
+            for(let i=0; i<pLength; i++) {
+                let d = new Date(nextStart);
+                d.setDate(nextStart.getDate() + i);
+                allPeriodDays.add(formatDate(d));
+            }
+
+            let ovulation = new Date(nextStart);
+            ovulation.setDate(nextStart.getDate() - 14);
+            ovulationDays.add(formatDate(ovulation));
+
+            for(let i = -5; i <= 4; i++) {
+                let fDay = new Date(ovulation);
+                fDay.setDate(ovulation.getDate() + i);
+                fertileWindows.add(formatDate(fDay));
+            }
+        }
+
+        renderCalendar();
+    }
+
+    function renderCalendar() {
+        const year = currentDate.getFullYear();
+        const month = currentDate.getMonth();
+        
+        document.getElementById('currentMonthStr').innerText = `${year}年${month + 1}月`;
+
+        const grid = document.getElementById('daysGrid');
+        grid.innerHTML = '';
+
+        const firstDayIndex = new Date(year, month, 1).getDay();
+        const totalDays = new Date(year, month + 1, 0).getDate();
+
+        for (let i = 0; i < firstDayIndex; i++) {
+            let emptyCell = document.createElement('div');
+            emptyCell.className = 'day-cell empty';
+            grid.appendChild(emptyCell);
+        }
+
+        for (let day = 1; day <= totalDays; day++) {
+            const dateSrc = new Date(year, month, day);
+            const dateStr = formatDate(dateSrc);
+
+            let cell = document.createElement('div');
+            cell.className = 'day-cell';
+            cell.innerText = day;
+            cell.dataset.date = dateStr;
+
+            if (allPeriodDays.has(dateStr)) {
+                cell.classList.add('period-active'); 
+                if (periodStarts.includes(dateStr)) {
+                    cell.classList.add('period-start-icon');
+                }
+            } else if (ovulationDays.has(dateStr)) {
+                if (earliestStartDate && dateSrc >= earliestStartDate) {
+                    cell.classList.add('ovulation-day');
+                }
+            } else if (fertileWindows.has(dateStr)) {
+                if (earliestStartDate && dateSrc >= earliestStartDate) {
+                    cell.classList.add('fertile-window');
+                }
+            } else {
+                if (earliestStartDate && dateSrc >= earliestStartDate) {
+                    cell.classList.add('safe-zone');
+                }
+            }
+
+            if (dateStr === selectedDateStr) {
+                cell.style.border = '2px solid #333';
+                cell.style.borderRadius = '8px';
+            }
+
+            cell.onclick = function() {
+                selectDate(dateStr);
+            };
+
+            grid.appendChild(cell);
+        }
+    }
+
+    function selectDate(dateStr) {
+        selectedDateStr = dateStr;
+        document.getElementById('selectedDateText').innerText = `已选日期: ${dateStr}`;
+        
+        const btn = document.getElementById('actionBtn');
+        if (periodStarts.includes(dateStr)) {
+            btn.innerText = '取消月经第一天标记';
+        } else {
+            btn.innerText = '设为月经第一天';
+        }
+
+        renderCalendar();
+    }
+
+    function togglePeriodStart() {
+        if (!selectedDateStr) {
+            alert('请先在日历上点击选择一天');
+            return;
+        }
+        
+        const index = periodStarts.indexOf(selectedDateStr);
+        if (index > -1) {
+            periodStarts.splice(index, 1); 
+        } else {
+            periodStarts.push(selectedDateStr); 
+        }
+        
+        selectDate(selectedDateStr);
+        saveAndCalculate();
+    }
+
+    function changeMonth(direction) {
+        currentDate.setMonth(currentDate.getMonth() + direction);
+        renderCalendar();
+    }
+
+    function formatDate(date) {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    }
+</script>
+
+</body>
+</html>
